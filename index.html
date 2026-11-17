@@ -55,11 +55,14 @@ svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
   <aside>
     <div class="card">
       <h2>Add item</h2>
+      <div class="row one"><label>Product link — paste to auto-fill size
+        <span style="display:flex;gap:6px"><input id="n-link" type="url" placeholder="https://…"><button type="button" id="fetch">Fetch</button></span></label></div>
+      <p class="hint" id="fetch-status" role="status"></p>
+      <div class="row one" id="cand-wrap" hidden><label>Sizes found on page<select id="cand"></select></label></div>
       <div class="row one"><label>Name<input id="n-name" placeholder="e.g. Bed frame"></label></div>
       <div class="row"><label>Length mm<input id="n-l" type="number" min="1" value="600"></label>
         <label>Width mm<input id="n-w" type="number" min="1" value="400"></label>
         <label>Height mm<input id="n-h" type="number" min="1" value="450"></label></div>
-      <div class="row one"><label>Product link (optional)<input id="n-link" type="url" placeholder="https://…"></label></div>
       <div class="btns"><button class="primary" id="add">Add to van</button>
         <button id="add-cool">+ Cool box</button></div>
       <p class="hint">Length runs along the van; rotate swaps it. Dimensions are outer sizes.</p>
@@ -263,7 +266,7 @@ $('#add').onclick = () => {
   const link = $('#n-link').value.trim();
   if (link && !safeLink(link)) return alert('Link must start with http:// or https://');
   addItem({ name: $('#n-name').value.trim(), l, w, h, link });
-  $('#n-name').value = ''; $('#n-link').value = '';
+  $('#n-name').value = ''; $('#n-link').value = ''; lastLookup = ''; $('#cand-wrap').hidden = true; setStatus('');
 };
 $('#add-cool').onclick = () => addItem({ name: 'Cool box', l: 600, w: 400, h: 450, color: '#38bdf8', notes: 'Edit to your cool box’s real size' });
 
@@ -319,6 +322,39 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'r' || e.key === 'R') rotate();
   else if (e.key === 'Delete' || e.key === 'Backspace') del();
 });
+
+// ---- auto-fill from product link (needs `node server.js`) ----
+let cands = [], lastLookup = '';
+function setStatus(t, bad) { const e = $('#fetch-status'); e.textContent = t; e.style.color = bad ? 'var(--bad)' : ''; }
+function applyCand(i) {
+  const c = cands[i]; if (!c) return;
+  $('#n-l').value = c.l; $('#n-w').value = c.w; $('#n-h').value = c.h;
+}
+async function lookup() {
+  const link = $('#n-link').value.trim();
+  if (!link) return;
+  if (!safeLink(link)) return setStatus('Link must start with http:// or https://', true);
+  lastLookup = link; $('#cand-wrap').hidden = true;
+  setStatus('Fetching…');
+  try {
+    const r = await fetch('/api/lookup?url=' + encodeURIComponent(link));
+    const d = await r.json().catch(() => null);
+    if (!d) throw new Error('Lookup service not available — run “node server.js” and open the app from it');
+    if (d.error) throw new Error(d.error);
+    if (d.name && !$('#n-name').value.trim()) $('#n-name').value = d.name;
+    cands = d.candidates || [];
+    if (!cands.length) return setStatus('No dimensions found on that page — enter them manually. Name filled if available.', true);
+    const sel = $('#cand'); sel.innerHTML = '';
+    cands.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = `${c.l} × ${c.w} × ${c.h} mm — ${c.source}`; sel.append(o); });
+    $('#cand-wrap').hidden = cands.length < 2;
+    applyCand(0);
+    setStatus('Filled from page (assumed length × width × height). Check against the product page before adding.');
+  } catch (e) { setStatus(e.message === 'Failed to fetch' ? 'Lookup service not available — run “node server.js”.' : e.message, true); }
+}
+$('#fetch').onclick = lookup;
+$('#n-link').addEventListener('change', () => { if ($('#n-link').value.trim() !== lastLookup) lookup(); });
+$('#n-link').addEventListener('paste', () => setTimeout(() => { if ($('#n-link').value.trim() !== lastLookup) lookup(); }, 0));
+$('#cand').addEventListener('change', e => applyCand(+e.target.value));
 
 // import / export / reset
 $('#export').onclick = () => {
