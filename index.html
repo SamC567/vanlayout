@@ -79,6 +79,12 @@ svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
       <div id="warns"></div>
     </div>
 
+    <div class="card" id="lib-card" hidden>
+      <h2>My items (from items.json)</h2>
+      <ul id="lib" style="list-style:none;margin:0;padding:0"></ul>
+      <div class="btns"><button id="lib-all">Add all to van</button></div>
+    </div>
+
     <div class="card">
       <h2>Items</h2>
       <ul id="list"></ul>
@@ -355,6 +361,29 @@ $('#fetch').onclick = lookup;
 $('#n-link').addEventListener('change', () => { if ($('#n-link').value.trim() !== lastLookup) lookup(); });
 $('#n-link').addEventListener('paste', () => setTimeout(() => { if ($('#n-link').value.trim() !== lastLookup) lookup(); }, 0));
 $('#cand').addEventListener('change', e => applyCand(+e.target.value));
+
+// ---- library of known items (items.json, served by server.js) ----
+let lib = [];
+async function loadLib() {
+  try {
+    const r = await fetch('items.json'); if (!r.ok) return;
+    lib = (await r.json()).filter(i => i && i.l > 0 && i.w > 0 && i.h > 0);
+  } catch { return; }
+  if (!lib.length) return;
+  $('#lib-card').hidden = false;
+  const ul = $('#lib'); ul.innerHTML = '';
+  lib.forEach((it, i) => {
+    const li = document.createElement('li'); li.style.cssText = 'display:flex;gap:8px;align-items:center;padding:4px 0';
+    const m = document.createElement('div'); m.style.flex = '1';
+    const n = document.createElement('strong'); n.textContent = it.name;
+    const sm = document.createElement('small'); sm.style.cssText = 'display:block;color:var(--mute)'; sm.textContent = `${it.l}×${it.w}×${it.h} mm`;
+    m.append(n, sm);
+    const b = document.createElement('button'); b.textContent = 'Add'; b.onclick = () => addItem(it);
+    li.append(m, b); ul.append(li);
+  });
+}
+$('#lib-all').onclick = () => lib.forEach(addItem);
+loadLib();
 
 // import / export / reset
 $('#export').onclick = () => {
