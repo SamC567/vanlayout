@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Van Layout Editor</title>
+<style>
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#1c2230;--mute:#667085;--line:#d9dde5;--accent:#2563eb;--bad:#dc2626;--floor:#eef0f4;--arch:#9aa3b2}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--panel:#1b2029;--ink:#e6e9ef;--mute:#97a0b0;--line:#303747;--accent:#5b8def;--bad:#f87171;--floor:#232a36;--arch:#4a5568}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 auto 0 0}
+main{display:grid;grid-template-columns:340px 1fr;gap:12px;padding:12px 16px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 8px}
+label{display:block;font-size:12px;color:var(--mute)}
+input,select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.row{display:grid;gap:6px;grid-template-columns:repeat(3,1fr);margin-bottom:6px}
+.row.two{grid-template-columns:1fr 1fr}.row.one{grid-template-columns:1fr}
+button{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer;font:inherit}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--bad)}
+button:hover{filter:brightness(.95)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+ul#list{list-style:none;margin:0;padding:0}
+#list li{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+#list li.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+#list .sw{width:14px;height:14px;border-radius:3px;flex:none}
+#list .meta{flex:1;min-width:0}
+#list .meta small{color:var(--mute);display:block}
+#list a{font-size:12px}
+.warn{color:var(--bad);font-size:12px;margin:4px 0 0}
+.stat{color:var(--mute);font-size:12px}
+svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
+.view-title{font-size:12px;color:var(--mute);margin:0 0 4px}
+.hint{font-size:12px;color:var(--mute)}
+.it rect{stroke:#0006;stroke-width:3}
+.it.sel rect{stroke:var(--accent);stroke-width:8}
+.it.bad rect{stroke:var(--bad);stroke-width:8;stroke-dasharray:24 12}
+.it text{pointer-events:none;font-size:70px;fill:#111;paint-order:stroke;stroke:#fff9;stroke-width:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚐 Van Layout Editor</h1>
+  <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="snap" checked style="width:auto"> Snap 10 mm</label>
+  <button id="export">Export JSON</button>
+  <button id="import">Import JSON</button>
+  <button id="reset" class="danger">Reset</button>
+  <input type="file" id="file" accept="application/json" hidden>
+</header>
+<main>
+  <aside>
+    <div class="card">
+      <h2>Add item</h2>
+      <div class="row one"><label>Name<input id="n-name" placeholder="e.g. Bed frame"></label></div>
+      <div class="row"><label>Length mm<input id="n-l" type="number" min="1" value="600"></label>
+        <label>Width mm<input id="n-w" type="number" min="1" value="400"></label>
+        <label>Height mm<input id="n-h" type="number" min="1" value="450"></label></div>
+      <div class="row one"><label>Product link (optional)<input id="n-link" type="url" placeholder="https://…"></label></div>
+      <div class="btns"><button class="primary" id="add">Add to van</button>
+        <button id="add-cool">+ Cool box</button></div>
+      <p class="hint">Length runs along the van; rotate swaps it. Dimensions are outer sizes.</p>
+    </div>
+
+    <div class="card" id="editor" hidden>
+      <h2>Selected item</h2>
+      <div class="row two"><label>Name<input data-f="name"></label><label>Colour<input data-f="color" type="color"></label></div>
+      <div class="row"><label>Length<input data-f="l" type="number" min="1"></label><label>Width<input data-f="w" type="number" min="1"></label><label>Height<input data-f="h" type="number" min="1"></label></div>
+      <div class="row"><label>X from bulkhead<input data-f="x" type="number"></label><label>Y from left wall<input data-f="y" type="number"></label><label>Raised (z)<input data-f="z" type="number" min="0"></label></div>
+      <div class="row one"><label>Link<input data-f="link" type="url"></label></div>
+      <div class="row one"><label>Notes<textarea data-f="notes" rows="2"></textarea></label></div>
+      <div class="btns"><button id="rot">Rotate 90°</button><button id="dup">Duplicate</button><button id="del" class="danger">Delete</button></div>
+      <div id="warns"></div>
+    </div>
+
+    <div class="card">
+      <h2>Items</h2>
+      <ul id="list"></ul>
+      <p class="stat" id="stats"></p>
+    </div>
+
+    <div class="card">
+      <h2>Van interior (mm)</h2>
+      <p class="hint">Defaults are rough placeholders, not verified Transit specs. Measure your own van and edit.</p>
+      <div class="row"><label>Length<input data-v="L" type="number"></label><label>Width<input data-v="W" type="number"></label><label>Height<input data-v="H" type="number"></label></div>
+      <div class="row"><label>Arch start<input data-v="archStart" type="number"></label><label>Arch length<input data-v="archLen" type="number"></label><label>Arch intrusion<input data-v="archIn" type="number"></label></div>
+      <div class="row"><label>Arch height<input data-v="archH" type="number"></label></div>
+    </div>
+  </aside>
+
+  <section>
+    <div class="card">
+      <p class="view-title">Top view — drag items · arrow keys nudge (Shift = 100 mm) · R rotates · Del deletes</p>
+      <svg id="plan" tabindex="0" aria-label="Top view floor plan"></svg>
+    </div>
+    <div class="card">
+      <p class="view-title">Side view (looking from the left wall)</p>
+      <svg id="side" aria-label="Side view"></svg>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+'use strict';
+const KEY = 'vanlayout.v1';
+const DEFAULT_VAN = { L: 3700, W: 1780, H: 1900, archStart: 1300, archLen: 900, archIn: 190, archH: 350 };
+const PALETTE = ['#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#eab308'];
+const $ = s => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+
+let state = load();
+let selected = null;
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.van && Array.isArray(s.items)) return s; } catch {}
+  return { van: { ...DEFAULT_VAN }, items: [] };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} }
+const uid = () => Math.random().toString(36).slice(2, 9);
+const num = (v, d = 0) => Number.isFinite(+v) && v !== '' ? +v : d;
+const snapOn = () => $('#snap').checked;
+const snap = v => snapOn() ? Math.round(v / 10) * 10 : Math.round(v);
+
+function safeLink(u) {
+  try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; }
+}
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } }
+
+function fp(it) { const r = it.rot % 180 !== 0; return { w: r ? it.w : it.l, h: r ? it.l : it.w }; }
+function rectOf(it) { const f = fp(it); return { x1: it.x, y1: it.y, x2: it.x + f.w, y2: it.y + f.h }; }
+const hit = (a, b) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+
+function arches() {
+  const v = state.van;
+  return [
+    { x1: v.archStart, y1: 0, x2: v.archStart + v.archLen, y2: v.archIn },
+    { x1: v.archStart, y1: v.W - v.archIn, x2: v.archStart + v.archLen, y2: v.W },
+  ];
+}
+function warnings(it) {
+  const v = state.van, r = rectOf(it), w = [];
+  if (r.x1 < 0 || r.y1 < 0 || r.x2 > v.L || r.y2 > v.W) w.push('Outside floor area');
+  if (it.z + it.h > v.H) w.push(`Taller than van (${it.z + it.h} > ${v.H} mm)`);
+  if (it.z < v.archH && arches().some(a => hit(r, a))) w.push('Collides with wheel arch');
+  for (const o of state.items) {
+    if (o === it) continue;
+    if (hit(r, rectOf(o)) && it.z < o.z + o.h && o.z < it.z + it.h) w.push(`Overlaps “${o.name}”`);
+  }
+  return w;
+}
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function renderPlan() {
+  const svg = $('#plan'), v = state.van, pad = 150;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `${-pad} ${-pad} ${v.L + pad * 2} ${v.W + pad * 2}`);
+  el('rect', { x: 0, y: 0, width: v.L, height: v.W, fill: 'var(--floor)', stroke: 'var(--ink)', 'stroke-width': 6 }, svg);
+  // grid every 500 mm
+  for (let x = 500; x < v.L; x += 500) el('line', { x1: x, y1: 0, x2: x, y2: v.W, stroke: 'var(--line)', 'stroke-width': 2 }, svg);
+  for (let y = 500; y < v.W; y += 500) el('line', { x1: 0, y1: y, x2: v.L, y2: y, stroke: 'var(--line)', 'stroke-width': 2 }, svg);
+  for (const a of arches()) el('rect', { x: a.x1, y: a.y1, width: a.x2 - a.x1, height: a.y2 - a.y1, fill: 'var(--arch)', opacity: .8 }, svg);
+  const t = (x, y, s, anchor = 'middle') => { const e = el('text', { x, y, 'text-anchor': anchor, fill: 'var(--mute)', 'font-size': 60 }, svg); e.textContent = s; };
+  t(v.L / 2, -60, `${v.L} mm`); t(-20, v.W / 2, `${v.W}`, 'end');
+  t(0, v.W + 100, '◀ cab / bulkhead', 'start'); t(v.L, v.W + 100, 'rear doors ▶', 'end');
+
+  for (const it of [...state.items].sort((a, b) => a.z - b.z)) {
+    const r = rectOf(it), bad = warnings(it).length > 0;
+    const g = el('g', { class: `it${it.id === selected ? ' sel' : ''}${bad ? ' bad' : ''}`, style: 'cursor:move' }, svg);
+    g.dataset.id = it.id;
+    el('rect', { x: r.x1, y: r.y1, width: r.x2 - r.x1, height: r.y2 - r.y1, fill: it.color, 'fill-opacity': .85, rx: 6 }, g);
+    const tx = el('text', { x: (r.x1 + r.x2) / 2, y: (r.y1 + r.y2) / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, g);
+    tx.textContent = it.name;
+  }
+}
+
+function renderSide() {
+  const svg = $('#side'), v = state.van, pad = 150;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `${-pad} ${-pad} ${v.L + pad * 2} ${v.H + pad * 2}`);
+  el('rect', { x: 0, y: 0, width: v.L, height: v.H, fill: 'var(--floor)', stroke: 'var(--ink)', 'stroke-width': 6 }, svg);
+  el('rect', { x: v.archStart, y: v.H - v.archH, width: v.archLen, height: v.archH, fill: 'var(--arch)', opacity: .8 }, svg);
+  const t = el('text', { x: v.L / 2, y: -60, 'text-anchor': 'middle', fill: 'var(--mute)', 'font-size': 60 }, svg);
+  t.textContent = `${v.H} mm high`;
+  for (const it of state.items) {
+    const r = rectOf(it), g = el('g', { class: `it${it.id === selected ? ' sel' : ''}` }, svg);
+    el('rect', { x: r.x1, y: v.H - it.z - it.h, width: r.x2 - r.x1, height: it.h, fill: it.color, 'fill-opacity': .5 }, g);
+    const tx = el('text', { x: (r.x1 + r.x2) / 2, y: v.H - it.z - it.h / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, g);
+    tx.textContent = it.name;
+  }
+}
+
+function renderList() {
+  const ul = $('#list'); ul.innerHTML = '';
+  for (const it of state.items) {
+    const li = document.createElement('li');
+    if (it.id === selected) li.className = 'sel';
+    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = it.color;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    const nm = document.createElement('strong'); nm.textContent = it.name;
+    const sm = document.createElement('small'); sm.textContent = `${it.l}×${it.w}×${it.h} mm`;
+    meta.append(nm, sm);
+    li.append(sw, meta);
+    const link = safeLink(it.link);
+    if (link) {
+      const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = host(link) || 'link'; a.addEventListener('click', e => e.stopPropagation());
+      li.append(a);
+    }
+    li.addEventListener('click', () => select(it.id));
+    ul.append(li);
+  }
+  const v = state.van;
+  const used = state.items.filter(i => i.z === 0).reduce((s, i) => s + i.l * i.w, 0);
+  const vol = state.items.reduce((s, i) => s + i.l * i.w * i.h, 0);
+  $('#stats').textContent = state.items.length
+    ? `Floor used: ${(used / (v.L * v.W) * 100).toFixed(0)}% (≈ ${(used / 1e6).toFixed(2)} m²) · Volume: ${(vol / 1e9).toFixed(2)} m³`
+    : 'No items yet.';
+}
+
+function renderEditor() {
+  const it = state.items.find(i => i.id === selected), box = $('#editor');
+  box.hidden = !it;
+  if (!it) return;
+  box.querySelectorAll('[data-f]').forEach(inp => { if (document.activeElement !== inp) inp.value = it[inp.dataset.f] ?? ''; });
+  const w = $('#warns'); w.innerHTML = '';
+  for (const m of warnings(it)) { const p = document.createElement('p'); p.className = 'warn'; p.textContent = '⚠ ' + m; w.append(p); }
+}
+
+function renderVan() {
+  document.querySelectorAll('[data-v]').forEach(i => { if (document.activeElement !== i) i.value = state.van[i.dataset.v]; });
+}
+
+function render() { renderPlan(); renderSide(); renderList(); renderEditor(); renderVan(); save(); }
+function select(id) { selected = id; render(); }
+
+function addItem(p) {
+  const it = {
+    id: uid(), name: p.name || 'Item', l: p.l, w: p.w, h: p.h, x: 0, y: 0, z: 0, rot: 0,
+    color: p.color || PALETTE[state.items.length % PALETTE.length], link: p.link || '', notes: p.notes || ''
+  };
+  // place at first free spot on a coarse grid, else at origin
+  outer: for (let x = 0; x + it.l <= state.van.L; x += 50) for (let y = 0; y + it.w <= state.van.W; y += 50) {
+    it.x = x; it.y = y;
+    if (!warnings(it).length) break outer;
+    it.x = 0; it.y = 0;
+  }
+  state.items.push(it); selected = it.id; render();
+}
+
+$('#add').onclick = () => {
+  const l = num($('#n-l').value), w = num($('#n-w').value), h = num($('#n-h').value);
+  if (l <= 0 || w <= 0 || h <= 0) return alert('Enter length, width and height in mm.');
+  const link = $('#n-link').value.trim();
+  if (link && !safeLink(link)) return alert('Link must start with http:// or https://');
+  addItem({ name: $('#n-name').value.trim(), l, w, h, link });
+  $('#n-name').value = ''; $('#n-link').value = '';
+};
+$('#add-cool').onclick = () => addItem({ name: 'Cool box', l: 600, w: 400, h: 450, color: '#38bdf8', notes: 'Edit to your cool box’s real size' });
+
+$('#editor').addEventListener('input', e => {
+  const f = e.target.dataset.f, it = state.items.find(i => i.id === selected);
+  if (!f || !it) return;
+  const v = e.target.value;
+  if (['l', 'w', 'h'].includes(f)) { if (num(v) > 0) it[f] = num(v); }
+  else if (['x', 'y', 'z'].includes(f)) it[f] = Math.max(f === 'z' ? 0 : -1e5, num(v));
+  else if (f === 'link') it.link = safeLink(v) ? v : (v === '' ? '' : it.link);
+  else it[f] = v;
+  render();
+});
+$('#rot').onclick = rotate;
+$('#dup').onclick = () => { const it = state.items.find(i => i.id === selected); if (it) { const c = { ...it, id: uid(), x: it.x + 50, y: it.y + 50 }; state.items.push(c); selected = c.id; render(); } };
+$('#del').onclick = del;
+function rotate() { const it = state.items.find(i => i.id === selected); if (it) { it.rot = (it.rot + 90) % 180; render(); } }
+function del() { state.items = state.items.filter(i => i.id !== selected); selected = null; render(); }
+
+document.querySelectorAll('[data-v]').forEach(i => i.addEventListener('input', () => {
+  const k = i.dataset.v, v = num(i.value);
+  if (v > 0 || k === 'archStart') { state.van[k] = v; render(); }
+}));
+
+// drag on plan
+const plan = $('#plan');
+let drag = null;
+function toSvg(e) { const p = plan.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(plan.getScreenCTM().inverse()); }
+plan.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.it'); plan.focus();
+  if (!g) { select(null); return; }
+  const it = state.items.find(i => i.id === g.dataset.id), p = toSvg(e);
+  drag = { id: it.id, dx: p.x - it.x, dy: p.y - it.y };
+  plan.setPointerCapture(e.pointerId);
+  select(it.id);
+});
+plan.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const it = state.items.find(i => i.id === drag.id), p = toSvg(e);
+  it.x = snap(p.x - drag.dx); it.y = snap(p.y - drag.dy);
+  render();
+});
+plan.addEventListener('pointerup', () => { drag = null; });
+plan.addEventListener('pointercancel', () => { drag = null; });
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag)) return;
+  const it = state.items.find(i => i.id === selected); if (!it) return;
+  const s = e.shiftKey ? 100 : 10;
+  const m = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[e.key];
+  if (m) { it.x += m[0]; it.y += m[1]; e.preventDefault(); render(); }
+  else if (e.key === 'r' || e.key === 'R') rotate();
+  else if (e.key === 'Delete' || e.key === 'Backspace') del();
+});
+
+// import / export / reset
+$('#export').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+  a.download = 'van-layout.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('#import').onclick = () => $('#file').click();
+$('#file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const s = JSON.parse(await f.text());
+    if (!s.van || !Array.isArray(s.items)) throw 0;
+    state = { van: { ...DEFAULT_VAN, ...s.van }, items: s.items.map(i => ({ rot: 0, z: 0, link: '', notes: '', color: '#888888', ...i, id: uid() })) };
+    selected = null; render();
+  } catch { alert('Not a valid layout file.'); }
+  e.target.value = '';
+};
+$('#reset').onclick = () => { if (confirm('Clear all items and reset van size?')) { state = { van: { ...DEFAULT_VAN }, items: [] }; selected = null; render(); } };
+
+render();
+})();
+</script>
+</body>
+</html>
