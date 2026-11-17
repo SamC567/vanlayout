@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Plan A — Sofa-bed up front, workshop / bathroom / garage at the back",
+    "description": "Front 1900 mm: 3-seat sofa along the driver's wall that pulls out into a ~1310 × 1900 mm bed (dashed area = pull-out space). Rear: workbench over the driver-side wheel arch with the QIDI Q2 on top, bathroom on the passenger side behind the arch, garage locker on the driver side at the back. Wheel-arch position/size and the side-door position are estimates — measure and edit.",
+    "van": { "L": 4256, "W": 1784, "H": 2025, "archStart": 2000, "archLen": 900, "archIn": 196, "archH": 350 },
+    "items": [
+      { "name": "Sofa (seat mode)", "l": 1900, "w": 750, "h": 900, "x": 20, "y": 40, "color": "#8b5cf6", "notes": "Folds forward/pulls out into the bed. Seat depth 750 mm." },
+      { "name": "Sofa-bed pull-out space", "zone": true, "l": 1900, "w": 560, "h": 450, "x": 20, "y": 790, "color": "#8b5cf6", "notes": "Reserved floor space so the bed can extend. Bed ≈ 1310 × 1900 mm." },
+      { "name": "Cool box", "l": 600, "w": 400, "h": 450, "x": 20, "y": 1350, "color": "#38bdf8", "notes": "Placeholder size — replace with your real cool box." },
+      { "name": "Workbench (over arch)", "l": 1000, "w": 500, "h": 550, "x": 1960, "y": 40, "z": 360, "color": "#f59e0b", "notes": "Raised above the arch (z = 360 mm); bench top at 910 mm." },
+      { "name": "QIDI Q2 3D printer", "l": 402, "w": 438, "h": 494, "x": 2000, "y": 60, "z": 910, "color": "#10b981", "link": "https://eu.qidi3d.com/products/qidi-q2?variant=43310850998355", "notes": "External size from the QIDI product page." },
+      { "name": "Bathroom (wet room)", "l": 750, "w": 700, "h": 1900, "x": 2960, "y": 1044, "color": "#06b6d4", "notes": "Cassette toilet + shower tray. Tight — see aisle note." },
+      { "name": "Garage locker", "l": 1236, "w": 550, "h": 900, "x": 2980, "y": 40, "color": "#ef4444", "notes": "Bikes/gear/long items, accessed from the rear doors." }
+    ]
+  }
+]

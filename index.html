@@ -79,6 +79,14 @@ svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
       <div id="warns"></div>
     </div>
 
+    <div class="card" id="plans-card" hidden>
+      <h2>Plans</h2>
+      <select id="plan-sel"></select>
+      <p class="hint" id="plan-desc"></p>
+      <div class="btns"><button class="primary" id="plan-load">Load plan</button></div>
+      <p class="hint" id="plan-check"></p>
+    </div>
+
     <div class="card" id="lib-card" hidden>
       <h2>My items (from items.json)</h2>
       <ul id="lib" style="list-style:none;margin:0;padding:0"></ul>
@@ -93,7 +101,7 @@ svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
 
     <div class="card">
       <h2>Van interior (mm)</h2>
-      <p class="hint">Defaults are rough placeholders, not verified Transit specs. Measure your own van and edit.</p>
+      <p class="hint">Defaults: Transit L4 H3 (UK/EU) from published specs — length, width, height, arch gap. Wheel-arch position/length/height are estimates; measure yours. Insulation/cladding will reduce all of these.</p>
       <div class="row"><label>Length<input data-v="L" type="number"></label><label>Width<input data-v="W" type="number"></label><label>Height<input data-v="H" type="number"></label></div>
       <div class="row"><label>Arch start<input data-v="archStart" type="number"></label><label>Arch length<input data-v="archLen" type="number"></label><label>Arch intrusion<input data-v="archIn" type="number"></label></div>
       <div class="row"><label>Arch height<input data-v="archH" type="number"></label></div>
@@ -116,7 +124,8 @@ svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
 (() => {
 'use strict';
 const KEY = 'vanlayout.v1';
-const DEFAULT_VAN = { L: 3700, W: 1780, H: 1900, archStart: 1300, archLen: 900, archIn: 190, archH: 350 };
+// Ford Transit L4 H3 (UK/EU Mk8, RWD): load length at floor 4256, width 1784, between arches 1392 (=> 196 per side), height 2025. Arch position/length/height are ESTIMATES.
+const DEFAULT_VAN = { L: 4256, W: 1784, H: 2025, archStart: 2000, archLen: 900, archIn: 196, archH: 350 };
 const PALETTE = ['#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#ef4444','#14b8a6','#eab308'];
 const $ = s => document.querySelector(s);
 const NS = 'http://www.w3.org/2000/svg';
@@ -186,7 +195,7 @@ function renderPlan() {
     const r = rectOf(it), bad = warnings(it).length > 0;
     const g = el('g', { class: `it${it.id === selected ? ' sel' : ''}${bad ? ' bad' : ''}`, style: 'cursor:move' }, svg);
     g.dataset.id = it.id;
-    el('rect', { x: r.x1, y: r.y1, width: r.x2 - r.x1, height: r.y2 - r.y1, fill: it.color, 'fill-opacity': .85, rx: 6 }, g);
+    el('rect', { x: r.x1, y: r.y1, width: r.x2 - r.x1, height: r.y2 - r.y1, fill: it.color, 'fill-opacity': it.zone ? .2 : .85, rx: 6, ...(it.zone ? { 'stroke-dasharray': '30 15' } : {}) }, g);
     const tx = el('text', { x: (r.x1 + r.x2) / 2, y: (r.y1 + r.y2) / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, g);
     tx.textContent = it.name;
   }
@@ -202,7 +211,7 @@ function renderSide() {
   t.textContent = `${v.H} mm high`;
   for (const it of state.items) {
     const r = rectOf(it), g = el('g', { class: `it${it.id === selected ? ' sel' : ''}` }, svg);
-    el('rect', { x: r.x1, y: v.H - it.z - it.h, width: r.x2 - r.x1, height: it.h, fill: it.color, 'fill-opacity': .5 }, g);
+    el('rect', { x: r.x1, y: v.H - it.z - it.h, width: r.x2 - r.x1, height: it.h, fill: it.color, 'fill-opacity': it.zone ? .15 : .5 }, g);
     const tx = el('text', { x: (r.x1 + r.x2) / 2, y: v.H - it.z - it.h / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, g);
     tx.textContent = it.name;
   }
@@ -229,8 +238,8 @@ function renderList() {
     ul.append(li);
   }
   const v = state.van;
-  const used = state.items.filter(i => i.z === 0).reduce((s, i) => s + i.l * i.w, 0);
-  const vol = state.items.reduce((s, i) => s + i.l * i.w * i.h, 0);
+  const used = state.items.filter(i => i.z === 0 && !i.zone).reduce((s, i) => s + i.l * i.w, 0);
+  const vol = state.items.filter(i => !i.zone).reduce((s, i) => s + i.l * i.w * i.h, 0);
   $('#stats').textContent = state.items.length
     ? `Floor used: ${(used / (v.L * v.W) * 100).toFixed(0)}% (≈ ${(used / 1e6).toFixed(2)} m²) · Volume: ${(vol / 1e9).toFixed(2)} m³`
     : 'No items yet.';
@@ -384,6 +393,29 @@ async function loadLib() {
 }
 $('#lib-all').onclick = () => lib.forEach(addItem);
 loadLib();
+
+// ---- plans (plans.json) ----
+let plans = [];
+function planCheck() {
+  const bad = state.items.filter(i => warnings(i).length);
+  $('#plan-check').textContent = bad.length ? `⚠ ${bad.length} item(s) have fit problems: ` + bad.map(i => i.name).join(', ') : '✓ Everything fits: no overlaps, wall or arch collisions, height OK.';
+}
+async function loadPlans() {
+  try { const r = await fetch('plans.json'); if (!r.ok) return; plans = await r.json(); } catch { return; }
+  if (!plans.length) return;
+  $('#plans-card').hidden = false;
+  const sel = $('#plan-sel'); sel.innerHTML = '';
+  plans.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; sel.append(o); });
+  const show = () => { $('#plan-desc').textContent = plans[+sel.value].description || ''; };
+  sel.onchange = show; show();
+  $('#plan-load').onclick = () => {
+    if (state.items.length && !confirm('Replace the current layout with this plan?')) return;
+    const p = plans[+sel.value];
+    state = { van: { ...DEFAULT_VAN, ...p.van }, items: p.items.map((i, n) => ({ rot: 0, z: 0, link: '', notes: '', color: PALETTE[n % PALETTE.length], ...i, id: uid() })) };
+    selected = null; render(); planCheck();
+  };
+}
+loadPlans();
 
 // import / export / reset
 $('#export').onclick = () => {

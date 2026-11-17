@@ -142,8 +142,8 @@ const server = http.createServer(async (req, res) => {
   }
   if (u.pathname === '/' || u.pathname === '/index.html')
     return send(200, fs.readFileSync(path.join(__dirname, 'index.html')), 'text/html; charset=utf-8');
-  if (u.pathname === '/items.json')
-    return send(200, fs.readFileSync(path.join(__dirname, 'items.json')));
+  if (u.pathname === '/items.json' || u.pathname === '/plans.json')
+    return send(200, fs.readFileSync(path.join(__dirname, u.pathname.slice(1))));
   send(404, { error: 'Not found' });
 });
 
